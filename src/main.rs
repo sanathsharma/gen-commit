@@ -20,12 +20,21 @@ async fn main() -> error::Result<()> {
   let anthropic_key = env::var("ANTHROPIC_API_KEY")?;
   let root_dir = git::get_git_root().await?;
 
+  let mut ignore_list: Vec<String> = matches
+    .get_one::<String>("ignore")
+    .map(|s| {
+      s.split(',')
+        .map(|item| format!(":!{}", item.trim()))
+        .collect()
+    })
+    .unwrap_or_default();
+
   let branch_name = git::get_branch_name().await?;
   let scopes = file::read_file(format!("{}/scopes.txt", root_dir))
     .await
     .unwrap_or_default();
   let is_nx_repo = file::file_exists(format!("{}/nx.json", root_dir));
-  let diff = git::get_staged_diff().await?;
+  let diff = git::get_staged_diff(&mut ignore_list).await?;
 
   let user_prompt = prompt::get_user_prompt(branch_name, scopes, is_nx_repo, diff);
 

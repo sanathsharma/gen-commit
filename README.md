@@ -14,6 +14,7 @@ Gen-Commit analyzes your staged git changes and generates meaningful, convention
 - Supports Nx repository structure detection
 - Allows custom scopes via a `scopes.txt` file
 - Provides a dry-run option to preview messages without committing
+- Supports ignoring specific files or directories from the git diff analysis
 
 ## Installation
 
@@ -49,6 +50,9 @@ gen-commit --model claude-3-opus-20240229
 
 # Specify maximum token length for the response
 gen-commit --max-tokens 1000
+
+# Ignore specific files or directories in the diff
+gen-commit --ignore "node_modules,dist,*.log"
 ```
 
 ## Configuration
@@ -72,6 +76,23 @@ core
 docs
 ci
 ```
+
+### Ignore List
+
+You can specify files or directories to ignore when generating commit messages:
+
+```bash
+# Ignore a single file
+gen-commit --ignore "package-lock.json"
+
+# Ignore multiple files or directories (comma-separated)
+gen-commit --ignore "package-lock.json,node_modules,dist"
+
+# Use glob patterns
+gen-commit --ignore "**/package-lock.json,*.log"
+```
+
+By default, `**/package-lock.json` is ignored.
 
 ## How It Works
 

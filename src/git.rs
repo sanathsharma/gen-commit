@@ -16,7 +16,7 @@ pub async fn is_git_repo() -> bool {
     .current_dir(".")
     .output()
     .await;
-  
+
   let output = match output {
     Ok(output) => output,
     Err(_) => return false,
@@ -25,9 +25,15 @@ pub async fn is_git_repo() -> bool {
   output.status.success()
 }
 
-pub async fn get_staged_diff() -> Result<String> {
+pub async fn get_staged_diff(ignore_list: &mut Vec<String>) -> Result<String> {
+  let mut args: Vec<String> = Vec::from(["diff".to_string(), "--staged".to_string()]);
+  if !ignore_list.is_empty() {
+    args.push("--".to_string());
+    args.append(ignore_list);
+  }
+
   let output = Command::new("git")
-    .args(&["diff", "--staged"])
+    .args(&args)
     .current_dir(".")
     .output()
     .await
