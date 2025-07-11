@@ -1,9 +1,10 @@
 use clap::{Arg, ArgMatches, Command};
+use std::env;
 
 pub fn get_matches() -> ArgMatches {
   Command::new("gen-commit")
     .version(env!("CARGO_PKG_VERSION"))
-    .about("Generate commit messages using Anthropic API")
+    .about("Generate commit messages using AI models from Anthropic and OpenAI")
     .arg(
       Arg::new("dry-run")
         .short('n')
@@ -16,15 +17,16 @@ pub fn get_matches() -> ArgMatches {
       Arg::new("model")
         .short('m')
         .long("model")
-        .help("Specify the Anthropic model to use (default: claude-sonnet-4-20250514)")
-        .value_name("MODEL")
-        .default_value("claude-sonnet-4-20250514"),
+        .help("Specify the model to use in format 'provider:model' (e.g., anthropic:claude-sonnet-4-20250514 or openai:gpt-4)")
+        .env("GC_DEFAULT_MODEL")
+        .default_value("anthropic:claude-sonnet-4-20250514")
+        .value_name("MODEL"),
     )
     .arg(
       Arg::new("max-tokens")
         .short('t')
         .long("max-tokens")
-        .help("Maximum number of tokens in the generated response (default: 500)")
+        .help("Maximum number of tokens in the generated response")
         .value_name("COUNT")
         .value_parser(clap::value_parser!(u32))
         .default_value("500"),

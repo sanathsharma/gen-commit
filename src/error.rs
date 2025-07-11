@@ -1,4 +1,4 @@
-use crate::anthropic::AnthropicClientError;
+use crate::client::{ClientError, CreateClientError};
 use crate::git;
 use std::env;
 
@@ -11,7 +11,9 @@ pub enum Error {
   #[error(transparent)]
   IoError(#[from] std::io::Error),
   #[error(transparent)]
-  AnthropicClientError(#[from] AnthropicClientError),
+  ClientError(#[from] ClientError),
+  #[error(transparent)]
+  CreateClientError(#[from] CreateClientError),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

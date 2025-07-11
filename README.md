@@ -1,15 +1,16 @@
 # Gen-Commit
 
-A CLI tool that generates conventional commit messages using the Anthropic Claude AI model.
+A CLI tool that generates conventional commit messages using AI models from Anthropic and OpenAI.
 
 ## Overview
 
-Gen-Commit analyzes your staged git changes and generates meaningful, conventional commit messages. It leverages the Anthropic Claude API to understand code changes and produce well-formatted commit messages that follow the [Conventional Commits](https://www.conventionalcommits.org/) specification.
+Gen-Commit analyzes your staged git changes and generates meaningful, conventional commit messages. It leverages AI models from Anthropic and OpenAI to understand code changes and produce well-formatted commit messages that follow the [Conventional Commits](https://www.conventionalcommits.org/) specification.
 
 ## Features
 
 - Generates commit messages based on staged git changes
 - Follows conventional commit format (`type(scope): description`)
+- Supports both Anthropic and OpenAI models
 - Considers branch name for context
 - Supports Nx repository structure detection
 - Allows custom scopes via a `scopes.txt` file
@@ -33,8 +34,10 @@ cp target/release/gen-commit ~/.local/bin/
 ## Usage
 
 ```bash
-# Set your Anthropic API key
+# Set your API key for the model provider you want to use
 export ANTHROPIC_API_KEY=your_api_key_here
+# OR
+export OPENAI_API_KEY=your_api_key_here
 
 # Stage your changes
 git add .
@@ -45,8 +48,9 @@ gen-commit
 # Generate a commit message without committing (dry run)
 gen-commit --dry-run
 
-# Specify a different Claude model
-gen-commit --model claude-3-opus-20240229
+# Specify a different model with provider prefix
+gen-commit --model anthropic:claude-sonnet-4-20250514
+gen-commit --model openai:gpt-4
 
 # Specify maximum token length for the response
 gen-commit --max-tokens 1000
@@ -57,12 +61,24 @@ gen-commit --ignore "node_modules,dist,*.log"
 
 ## Configuration
 
-### API Key
+### API Keys
 
-Set your Anthropic API key as an environment variable:
+Set your API key as an environment variable for the model provider you want to use:
 
 ```bash
+# For Anthropic models
 export ANTHROPIC_API_KEY=your_api_key_here
+
+# For OpenAI models
+export OPENAI_API_KEY=your_api_key_here
+```
+
+### Default Model
+
+You can set a default model by setting the `GC_DEFAULT_MODEL` environment variable:
+
+```bash
+export GC_DEFAULT_MODEL=openai:gpt-4
 ```
 
 ### Custom Scopes
@@ -100,7 +116,7 @@ By default, `**/package-lock.json` is ignored.
 2. Gets the current branch name for context
 3. Checks for custom scopes and Nx repository structure
 4. Retrieves the diff of staged changes
-5. Sends the information to Anthropic's Claude AI model
+5. Sends the information to the selected AI model
 6. Presents the generated commit message
 7. Optionally commits with the generated message after confirmation
 
@@ -108,7 +124,7 @@ By default, `**/package-lock.json` is ignored.
 
 - Rust 1.56 or later
 - Git
-- Anthropic API key
+- API key for Anthropic or OpenAI
 
 ## License
 

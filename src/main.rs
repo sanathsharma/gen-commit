@@ -1,12 +1,13 @@
-use crate::anthropic::AnthropicClient;
+use crate::client::{AIClient, Client};
 use crate::git::is_git_repo;
-use std::env;
 
 mod anthropic;
 mod args;
+mod client;
 mod error;
 mod file;
 mod git;
+mod openai;
 mod prompt;
 
 #[tokio::main]
@@ -17,7 +18,6 @@ async fn main() -> error::Result<()> {
   };
 
   let matches = args::get_matches();
-  let anthropic_key = env::var("ANTHROPIC_API_KEY")?;
   let root_dir = git::get_git_root().await?;
 
   let mut ignore_list: Vec<String> = matches
@@ -38,13 +38,15 @@ async fn main() -> error::Result<()> {
 
   let user_prompt = prompt::get_user_prompt(branch_name, scopes, is_nx_repo, diff);
 
-  let anthropic_client = AnthropicClient::new(anthropic_key)
-    .with_model(matches.get_one::<String>("model").unwrap().clone())
-    .with_max_tokens(*matches.get_one::<u32>("max-tokens").unwrap());
+  let client = client::create_client(
+    matches.get_one::<String>("model").unwrap(),
+    *matches.get_one::<u32>("max-tokens").unwrap(),
+  )?;
 
-  let commit_message = anthropic_client
-    .generate_commit_message_sync(user_prompt)
-    .await?;
+  let commit_message = match client {
+    Client::Anthropic(c) => c.generate_commit_message_sync(&user_prompt).await?,
+    Client::OpenAI(c) => c.generate_commit_message_sync(&user_prompt).await?,
+  };
 
   println!("Generated commit message:\n");
   println!("{}", commit_message);

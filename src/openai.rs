@@ -3,48 +3,47 @@ use reqwest::Client;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize)]
-struct AnthropicRequest {
+struct OpenAIRequest {
   model: String,
-  max_tokens: u32,
-  messages: Vec<Message>,
+  max_output_tokens: u32,
+  input: String,
   stream: bool,
 }
 
-#[derive(Debug, Serialize)]
-struct Message {
-  role: String,
-  content: String,
-}
-
 #[derive(Debug, Deserialize)]
-struct AnthropicResponse {
-  content: Vec<ContentBlock>,
+struct OpenAIResponse {
+  output: Vec<ContentBlock>,
 }
 
 #[derive(Debug, Deserialize)]
 struct ContentBlock {
+  content: Vec<OutputText>,
+}
+
+#[derive(Debug, Deserialize)]
+struct OutputText {
   text: String,
 }
 
-pub struct AnthropicClient {
+pub struct OpenAIClient {
   client: Client,
   api_key: String,
   model: String,
   max_tokens: u32,
 }
 
-impl AnthropicClient {
+impl OpenAIClient {
   pub fn new(api_key: String) -> Self {
     Self {
       client: Client::new(),
       api_key,
-      model: "claude-3-7-sonnet-20250219".to_string(),
+      model: "gpt-4.1".to_string(),
       max_tokens: 500,
     }
   }
 }
 
-impl AIClient for AnthropicClient {
+impl AIClient for OpenAIClient {
   fn with_model(&mut self, model: String) -> &mut Self {
     self.model = model;
     self
@@ -56,22 +55,18 @@ impl AIClient for AnthropicClient {
   }
 
   async fn generate_commit_message_sync<T: Into<String>>(&self, user_prompt: T) -> Result<String> {
-    let request = AnthropicRequest {
+    let request = OpenAIRequest {
       model: self.model.clone(),
-      max_tokens: self.max_tokens,
-      messages: vec![Message {
-        role: "user".to_string(),
-        content: user_prompt.into(),
-      }],
+      max_output_tokens: self.max_tokens,
+      input: user_prompt.into(),
       stream: false,
     };
 
     let response = self
       .client
-      .post("https://api.anthropic.com/v1/messages")
+      .post("https://api.openai.com/v1/responses")
       .header("Content-Type", "application/json")
-      .header("x-api-key", &self.api_key)
-      .header("anthropic-version", "2023-06-01")
+      .header("Authorization", format!("Bearer {}", &self.api_key))
       .json(&request)
       .send()
       .await
@@ -82,15 +77,17 @@ impl AIClient for AnthropicClient {
       return Err(ClientError::RequestFailed(error_text));
     }
 
-    let api_response: AnthropicResponse = response
+    let api_response: OpenAIResponse = response
       .json()
       .await
       .map_err(|_| ClientError::FailedToParseResponse)?;
 
     Ok(
       api_response
-        .content
+        .output
         .first()
+        .map(|block| block.content.first())
+        .flatten()
         .map(|block| block.text.trim().to_string())
         .unwrap_or_default(),
     )
