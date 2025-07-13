@@ -50,7 +50,7 @@ gen-commit --dry-run
 
 # Specify a different model with provider prefix
 gen-commit --model anthropic:claude-sonnet-4-20250514
-gen-commit --model openai:gpt-4
+gen-commit --model openai:gpt-4.1-mini
 
 # Specify maximum token length for the response
 gen-commit --max-tokens 1000
@@ -108,7 +108,15 @@ gen-commit --ignore "package-lock.json,node_modules,dist"
 gen-commit --ignore "**/package-lock.json,*.log"
 ```
 
-By default, `**/package-lock.json` is ignored.
+By default, `**/package-lock.json,Cargo.lock,**/bun.lock,**/pnpm-lock.yaml` are ignored.
+
+### Change Default Ignore List
+
+You can change the default ignore list by setting the `GC_IGNORE_LIST` environment variable:
+
+```bash
+export GC_IGNORE_LIST=**/package-lock.json,*.log
+```
 
 ## How It Works
 

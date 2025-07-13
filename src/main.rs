@@ -24,16 +24,17 @@ async fn main() -> error::Result<()> {
     .get_one::<String>("ignore")
     .map(|s| {
       s.split(',')
+        .filter(|item| !item.trim().is_empty())
         .map(|item| format!(":!{}", item.trim()))
         .collect()
     })
     .unwrap_or_default();
 
   let branch_name = git::get_branch_name().await?;
-  let scopes = file::read_file(format!("{}/scopes.txt", root_dir))
+  let scopes = file::read_file(format!("{root_dir}/scopes.txt"))
     .await
     .unwrap_or_default();
-  let is_nx_repo = file::file_exists(format!("{}/nx.json", root_dir));
+  let is_nx_repo = file::file_exists(format!("{root_dir}/nx.json"));
   let diff = git::get_staged_diff(&mut ignore_list).await?;
 
   let user_prompt = prompt::get_user_prompt(branch_name, scopes, is_nx_repo, diff);
@@ -49,7 +50,7 @@ async fn main() -> error::Result<()> {
   };
 
   println!("Generated commit message:\n");
-  println!("{}", commit_message);
+  println!("{commit_message}");
 
   if !matches.get_flag("dry-run") {
     println!("\nCommit with this message? (y/N)");

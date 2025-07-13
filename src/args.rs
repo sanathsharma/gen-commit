@@ -38,7 +38,8 @@ pub fn get_matches() -> ArgMatches {
         .help("Comma-separated list of files or directories to ignore in the diff")
         .value_name("FILES") // This appears in help text to describe the expected value format
         .num_args(1)
-        .default_value("**/package-lock.json"),
+        .env("GC_IGNORE_LIST")
+        .default_value("**/package-lock.json,Cargo.lock,**/bun.lock,**/pnpm-lock.yaml"),
     )
     .get_matches()
 }
