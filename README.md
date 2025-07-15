@@ -105,10 +105,10 @@ gen-commit --ignore "package-lock.json"
 gen-commit --ignore "package-lock.json,node_modules,dist"
 
 # Use glob patterns
-gen-commit --ignore "**/package-lock.json,*.log"
+gen-commit --ignore "package-lock.json,*.log"
 ```
 
-By default, `**/package-lock.json,Cargo.lock,**/bun.lock,**/pnpm-lock.yaml` are ignored.
+By default, `package-lock.json,Cargo.lock,bun.lock,pnpm-lock.yaml` are ignored.
 
 ### Change Default Ignore List
 

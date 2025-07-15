@@ -39,7 +39,7 @@ pub fn get_matches() -> ArgMatches {
         .value_name("FILES") // This appears in help text to describe the expected value format
         .num_args(1)
         .env("GC_IGNORE_LIST")
-        .default_value("**/package-lock.json,Cargo.lock,**/bun.lock,**/pnpm-lock.yaml"),
+        .default_value("package-lock.json,Cargo.lock,bun.lock,pnpm-lock.yaml"),
     )
     .get_matches()
 }
