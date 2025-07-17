@@ -37,6 +37,11 @@ async fn main() -> error::Result<()> {
   let is_nx_repo = file::file_exists(format!("{root_dir}/nx.json"));
   let diff = git::get_staged_diff(&mut ignore_list).await?;
 
+  if diff.is_empty() {
+    eprintln!("no changes detected");
+    std::process::exit(1);
+  }
+
   let user_prompt = prompt::get_user_prompt(branch_name, scopes, is_nx_repo, diff);
 
   let client = client::create_client(
