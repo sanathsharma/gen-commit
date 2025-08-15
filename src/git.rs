@@ -46,6 +46,51 @@ pub async fn get_staged_diff(ignore_list: &mut Vec<String>) -> Result<String> {
   Ok(String::from_utf8_lossy(&output.stdout).to_string())
 }
 
+pub async fn get_modified_files() -> Result<Vec<String>> {
+  let output = Command::new("git")
+    .args(&["diff", "--name-only", "--staged"])
+    .current_dir(".")
+    .output()
+    .await
+    .map_err(|_| GitError::FailedToExecuteCmd(String::from("git diff --name-only --staged")))?;
+
+  if !output.status.success() {
+    return Err(GitError::NoStagedChanges);
+  }
+
+  let files = String::from_utf8_lossy(&output.stdout)
+    .lines()
+    .map(|s| s.to_string())
+    .collect();
+
+  Ok(files)
+}
+
+pub async fn get_recent_commits(count: usize) -> Result<Vec<String>> {
+  let err = || GitError::FailedToExecuteCmd(String::from("git log"));
+  let output = Command::new("git")
+    .args(&["log", "--oneline", "-n", &count.to_string()])
+    .current_dir(".")
+    .output()
+    .await
+    .map_err(|_| err())?;
+
+  if !output.status.success() {
+    return Err(err());
+  }
+
+  let log = String::from_utf8_lossy(&output.stdout).to_string();
+  let commits = log
+    .lines()
+    .map(|line| {
+      // Skip the commit hash and just get the message
+      line.splitn(2, ' ').nth(1).unwrap_or("").to_string()
+    })
+    .collect();
+
+  Ok(commits)
+}
+
 pub async fn commit(message: &str) -> Result<()> {
   let mut child = Command::new("git")
     .args(&["commit", "-m", message, "-e"])
@@ -59,32 +104,32 @@ pub async fn commit(message: &str) -> Result<()> {
 }
 
 pub async fn get_branch_name() -> Result<String> {
-  let err = GitError::FailedToExecuteCmd(String::from("git branch --show-current"));
+  let err = || GitError::FailedToExecuteCmd(String::from("git branch --show-current"));
   let output = Command::new("git")
     .args(&["branch", "--show-current"])
     .current_dir(".")
     .output()
     .await
-    .map_err(|_| err.clone())?;
+    .map_err(|_| err())?;
 
   if !output.status.success() {
-    return Err(err);
+    return Err(err());
   }
 
   Ok(String::from_utf8_lossy(&output.stdout).to_string())
 }
 
 pub async fn get_git_root() -> Result<String> {
-  let err = GitError::FailedToExecuteCmd(String::from("git rev-parse --show-toplevel"));
+  let err = || GitError::FailedToExecuteCmd(String::from("git rev-parse --show-toplevel"));
   let output = Command::new("git")
     .args(&["rev-parse", "--show-toplevel"])
     .current_dir(".")
     .output()
     .await
-    .map_err(|_| err.clone())?;
+    .map_err(|_| err())?;
 
   if !output.status.success() {
-    return Err(err);
+    return Err(err());
   }
 
   Ok(String::from_utf8_lossy(&output.stdout).to_string())

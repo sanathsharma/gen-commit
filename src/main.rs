@@ -1,6 +1,9 @@
-use crate::client::{AIClient, Client};
+use client::Client;
+
+use crate::client::AIClient;
 use crate::git::is_git_repo;
 
+mod analysis;
 mod anthropic;
 mod args;
 mod client;
@@ -42,16 +45,38 @@ async fn main() -> error::Result<()> {
     std::process::exit(1);
   }
 
-  let user_prompt = prompt::get_user_prompt(branch_name, scopes, is_nx_repo, diff);
+  let modified_files = git::get_modified_files().await?;
+
+  let recent_commits = git::get_recent_commits(5).await?;
 
   let client = client::create_client(
     matches.get_one::<String>("model").unwrap(),
     *matches.get_one::<u32>("max-tokens").unwrap(),
   )?;
 
+  let change_analysis = analysis::analyze_changes_with_ai(&client, &diff).await?;
+
+  let user_prompt = prompt::get_commit_user_prompt(
+    branch_name,
+    scopes,
+    is_nx_repo,
+    diff,
+    modified_files,
+    recent_commits,
+    change_analysis,
+  )
+  .await?;
+
+  // Generate commit message directly using the client
   let commit_message = match client {
-    Client::Anthropic(c) => c.generate_commit_message_sync(&user_prompt).await?,
-    Client::OpenAI(c) => c.generate_commit_message_sync(&user_prompt).await?,
+    Client::OpenAI(c) => {
+      c.generate_response(prompt::get_commit_system_prompt(), user_prompt)
+        .await?
+    }
+    Client::Anthropic(c) => {
+      c.generate_response(prompt::get_commit_system_prompt(), user_prompt)
+        .await?
+    }
   };
 
   println!("Generated commit message:\n");

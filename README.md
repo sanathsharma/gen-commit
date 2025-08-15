@@ -115,7 +115,7 @@ By default, `package-lock.json,Cargo.lock,bun.lock,pnpm-lock.yaml` are ignored.
 You can change the default ignore list by setting the `GC_IGNORE_LIST` environment variable:
 
 ```bash
-export GC_IGNORE_LIST=**/package-lock.json,*.log
+export GC_IGNORE_LIST=package-lock.json,*.log
 ```
 
 ## How It Works

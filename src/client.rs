@@ -18,7 +18,12 @@ pub type Result<T> = std::result::Result<T, ClientError>;
 pub trait AIClient {
   fn with_model(&mut self, model: String) -> &mut Self;
   fn with_max_tokens(&mut self, max_tokens: u32) -> &mut Self;
-  async fn generate_commit_message_sync<T: Into<String>>(&self, user_prompt: T) -> Result<String>;
+  fn with_temperature(&mut self, temperature: f32) -> &mut Self;
+  async fn generate_response<T: Into<String>>(
+    &self,
+    system_prompt: T,
+    user_prompt: T,
+  ) -> Result<String>;
 }
 
 pub enum ModelProvider {
@@ -55,7 +60,10 @@ pub fn create_client(
   let client = match provider {
     ModelProvider::OpenAI => {
       let mut openai_client = OpenAIClient::new(api_key);
-      openai_client.with_model(model).with_max_tokens(max_tokens);
+      openai_client
+        .with_model(model)
+        .with_max_tokens(max_tokens)
+        .with_temperature(0.2);
 
       Client::OpenAI(openai_client)
     }
@@ -63,7 +71,8 @@ pub fn create_client(
       let mut anthropic_client = AnthropicClient::new(api_key);
       anthropic_client
         .with_model(model)
-        .with_max_tokens(max_tokens);
+        .with_max_tokens(max_tokens)
+        .with_temperature(0.2);
 
       Client::Anthropic(anthropic_client)
     }

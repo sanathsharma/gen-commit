@@ -1,10 +1,26 @@
-pub fn get_user_prompt(
+use crate::analysis::{format_recent_commits, group_files_by_type};
+use crate::client::Result;
+
+pub fn get_commit_system_prompt() -> String {
+  "You are an expert at generating git commit messages following conventional commit standards. Your response should only contain the commit message, nothing else.".to_string()
+}
+
+pub async fn get_commit_user_prompt(
   branch_name: String,
   scopes: String,
   is_nx_repo: bool,
   diff: String,
-) -> String {
-  format!("# Git Commit Message Generation Prompt
+  modified_files: Vec<String>,
+  recent_commits: Vec<String>,
+  change_analysis: String,
+) -> Result<String> {
+  // Group files by type
+  let grouped_files = group_files_by_type(modified_files.clone());
+
+  // Format recent commits
+  let recent_commits_str = format_recent_commits(recent_commits);
+
+  Ok(format!("# Git Commit Message Generation Prompt
 
 You are an expert at writing clear, concise, and meaningful git commit messages following conventional commit patterns.
 
@@ -100,7 +116,17 @@ Analyze the branch name, diff and scopes attached, to generate a conventional co
 Branch name: {}
 Scopes: {}
 Is Nx Repository: {}
+
 Diff of staged changes:
+{}
+
+Modified files:
+{}
+
+Recent commits:
+{}
+
+Change analysis:
 {}
 ```
 
@@ -108,5 +134,5 @@ ALWAYS RETURN COMMIT MESSAGE as STANDARD OUTPUT LIKE FOLLOWING AND NO EXPLANATIO
 JUST commit message, like following.
 
 <message-here>
-", branch_name, scopes, is_nx_repo, diff)
+", branch_name, scopes, is_nx_repo, diff, grouped_files, recent_commits_str, change_analysis))
 }

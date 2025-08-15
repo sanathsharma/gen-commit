@@ -3,10 +3,17 @@ use reqwest::Client;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize)]
+struct OpenAIMessage {
+  role: String,
+  content: String,
+}
+
+#[derive(Debug, Serialize)]
 struct OpenAIRequest {
   model: String,
-  max_output_tokens: u32,
-  input: String,
+  input: Vec<OpenAIMessage>,
+  max_tokens: u32,
+  temperature: f32,
   stream: bool,
 }
 
@@ -30,6 +37,7 @@ pub struct OpenAIClient {
   api_key: String,
   model: String,
   max_tokens: u32,
+  temperature: f32,
 }
 
 impl OpenAIClient {
@@ -39,6 +47,7 @@ impl OpenAIClient {
       api_key,
       model: "gpt-4.1".to_string(),
       max_tokens: 500,
+      temperature: 0.7,
     }
   }
 }
@@ -54,11 +63,31 @@ impl AIClient for OpenAIClient {
     self
   }
 
-  async fn generate_commit_message_sync<T: Into<String>>(&self, user_prompt: T) -> Result<String> {
+  fn with_temperature(&mut self, temperature: f32) -> &mut Self {
+    self.temperature = temperature;
+    self
+  }
+
+  async fn generate_response<T: Into<String>>(
+    &self,
+    system_prompt: T,
+    user_prompt: T,
+  ) -> Result<String> {
+    let system_message = OpenAIMessage {
+      role: "system".to_string(),
+      content: system_prompt.into(),
+    };
+
+    let user_message = OpenAIMessage {
+      role: "user".to_string(),
+      content: user_prompt.into(),
+    };
+
     let request = OpenAIRequest {
       model: self.model.clone(),
-      max_output_tokens: self.max_tokens,
-      input: user_prompt.into(),
+      input: vec![system_message, user_message],
+      max_tokens: self.max_tokens,
+      temperature: self.temperature,
       stream: false,
     };
 
@@ -86,8 +115,7 @@ impl AIClient for OpenAIClient {
       api_response
         .output
         .first()
-        .map(|block| block.content.first())
-        .flatten()
+        .and_then(|block| block.content.first())
         .map(|block| block.text.trim().to_string())
         .unwrap_or_default(),
     )

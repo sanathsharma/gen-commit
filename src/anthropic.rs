@@ -8,12 +8,20 @@ struct AnthropicRequest {
   max_tokens: u32,
   messages: Vec<Message>,
   stream: bool,
+  temperature: f32,
+	system: Vec<SystemMessage>,
 }
 
 #[derive(Debug, Serialize)]
 struct Message {
   role: String,
   content: String,
+}
+
+#[derive(Debug, Serialize)]
+struct SystemMessage {
+  r#type: String,
+  text: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -31,6 +39,7 @@ pub struct AnthropicClient {
   api_key: String,
   model: String,
   max_tokens: u32,
+  temperature: f32,
 }
 
 impl AnthropicClient {
@@ -40,6 +49,7 @@ impl AnthropicClient {
       api_key,
       model: "claude-3-7-sonnet-20250219".to_string(),
       max_tokens: 500,
+      temperature: 0.7,
     }
   }
 }
@@ -55,15 +65,34 @@ impl AIClient for AnthropicClient {
     self
   }
 
-  async fn generate_commit_message_sync<T: Into<String>>(&self, user_prompt: T) -> Result<String> {
+  fn with_temperature(&mut self, temperature: f32) -> &mut Self {
+    self.temperature = temperature;
+    self
+  }
+
+  async fn generate_response<T: Into<String>>(
+    &self,
+    system_prompt: T,
+    user_prompt: T,
+  ) -> Result<String> {
+    // Create system and user messages
+    let system_message = SystemMessage {
+      r#type: "text".to_string(),
+      text: system_prompt.into(),
+    };
+
+    let user_message = Message {
+      role: "user".to_string(),
+      content: user_prompt.into(),
+    };
+
     let request = AnthropicRequest {
       model: self.model.clone(),
       max_tokens: self.max_tokens,
-      messages: vec![Message {
-        role: "user".to_string(),
-        content: user_prompt.into(),
-      }],
+			system: vec![system_message],
+      messages: vec![user_message],
       stream: false,
+      temperature: self.temperature,
     };
 
     let response = self
