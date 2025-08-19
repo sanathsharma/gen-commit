@@ -1,4 +1,4 @@
-use crate::client::{AIClient, ClientError, Result};
+use crate::client::{AIClient, ClientError, GenerateResponseResult, Result, UsageInfo};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 
@@ -9,7 +9,7 @@ struct AnthropicRequest {
   messages: Vec<Message>,
   stream: bool,
   temperature: f32,
-	system: Vec<SystemMessage>,
+  system: Vec<SystemMessage>,
 }
 
 #[derive(Debug, Serialize)]
@@ -27,6 +27,13 @@ struct SystemMessage {
 #[derive(Debug, Deserialize)]
 struct AnthropicResponse {
   content: Vec<ContentBlock>,
+  usage: AnthropicUsage,
+}
+
+#[derive(Debug, Deserialize)]
+struct AnthropicUsage {
+  input_tokens: u32,
+  output_tokens: u32,
 }
 
 #[derive(Debug, Deserialize)]
@@ -74,7 +81,7 @@ impl AIClient for AnthropicClient {
     &self,
     system_prompt: T,
     user_prompt: T,
-  ) -> Result<String> {
+  ) -> Result<GenerateResponseResult> {
     // Create system and user messages
     let system_message = SystemMessage {
       r#type: "text".to_string(),
@@ -89,7 +96,7 @@ impl AIClient for AnthropicClient {
     let request = AnthropicRequest {
       model: self.model.clone(),
       max_tokens: self.max_tokens,
-			system: vec![system_message],
+      system: vec![system_message],
       messages: vec![user_message],
       stream: false,
       temperature: self.temperature,
@@ -116,12 +123,18 @@ impl AIClient for AnthropicClient {
       .await
       .map_err(|_| ClientError::FailedToParseResponse)?;
 
-    Ok(
-      api_response
-        .content
-        .first()
-        .map(|block| block.text.trim().to_string())
-        .unwrap_or_default(),
-    )
+    let message = api_response
+      .content
+      .first()
+      .map(|block| block.text.trim().to_string())
+      .unwrap_or_default();
+
+    let usage = UsageInfo {
+      input_tokens: api_response.usage.input_tokens,
+      output_tokens: api_response.usage.output_tokens,
+      total_tokens: api_response.usage.input_tokens + api_response.usage.output_tokens,
+    };
+
+    Ok(GenerateResponseResult { message, usage })
   }
 }

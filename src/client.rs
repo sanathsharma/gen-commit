@@ -3,6 +3,19 @@ use crate::openai::OpenAIClient;
 use std::env;
 use std::env::VarError;
 
+#[derive(Debug, Clone)]
+pub struct UsageInfo {
+  pub input_tokens: u32,
+  pub output_tokens: u32,
+  pub total_tokens: u32,
+}
+
+#[derive(Debug)]
+pub struct GenerateResponseResult {
+  pub message: String,
+  pub usage: UsageInfo,
+}
+
 #[derive(thiserror::Error, Debug)]
 pub enum ClientError {
   #[error("Failed to send request to API")]
@@ -23,7 +36,7 @@ pub trait AIClient {
     &self,
     system_prompt: T,
     user_prompt: T,
-  ) -> Result<String>;
+  ) -> Result<GenerateResponseResult>;
 }
 
 pub enum ModelProvider {

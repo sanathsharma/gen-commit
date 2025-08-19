@@ -1,4 +1,4 @@
-use crate::client::{AIClient, Client, Result};
+use crate::client::{AIClient, Client, GenerateResponseResult, Result};
 use std::collections::HashMap;
 
 pub fn group_files_by_type(modified_files: Vec<String>) -> String {
@@ -73,7 +73,10 @@ pub fn format_recent_commits(commits: Vec<String>) -> String {
   result
 }
 
-pub async fn analyze_changes_with_ai(client: &Client, diff: &str) -> Result<String> {
+pub async fn analyze_changes_with_ai(
+  client: &Client,
+  diff: &str,
+) -> Result<GenerateResponseResult> {
   // Create system prompt for analysis
   let system_prompt = "You are an expert code analyst. Analyze git diffs and provide concise summaries of changes. \
                         Focus on identifying new functions, modified functions, tests, dependencies, and overall purpose. \
@@ -99,10 +102,10 @@ pub async fn analyze_changes_with_ai(client: &Client, diff: &str) -> Result<Stri
   .to_string();
 
   // Call the AI model to analyze the changes
-  let analysis = match client {
+  let response = match client {
     Client::OpenAI(c) => c.generate_response(system_prompt, user_prompt).await?,
     Client::Anthropic(c) => c.generate_response(system_prompt, user_prompt).await?,
   };
 
-  Ok(analysis)
+  Ok(response)
 }

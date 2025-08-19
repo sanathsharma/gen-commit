@@ -23,7 +23,7 @@ async fn main() -> error::Result<()> {
   };
 
   let matches = args::get_matches();
-  
+
   let log_level = if matches.get_flag("verbose") {
     LogLevel::Verbose
   } else {
@@ -32,7 +32,7 @@ async fn main() -> error::Result<()> {
   let logger = Logger::new(log_level);
 
   logger.log_step("Initializing gen-commit");
-  
+
   logger.log_step("Getting git root directory");
   let root_dir = git::get_git_root().await?;
   logger.log_output(&format!("Git root: {}", root_dir));
@@ -58,7 +58,7 @@ async fn main() -> error::Result<()> {
   logger.log_step("Checking for Nx repository");
   let is_nx_repo = file::file_exists(format!("{root_dir}/nx.json"));
   logger.log_output(&format!("Nx repo: {}", is_nx_repo));
-  
+
   logger.log_step("Getting staged diff");
   let diff = git::get_staged_diff(&mut ignore_list).await?;
   logger.log_output(&format!("Diff length: {} characters", diff.len()));
@@ -93,11 +93,23 @@ async fn main() -> error::Result<()> {
     matches.get_one::<String>("model").unwrap(),
     *matches.get_one::<u32>("max-tokens").unwrap(),
   )?;
-  logger.log_output(&format!("Model: {}", matches.get_one::<String>("model").unwrap()));
+  logger.log_output(&format!(
+    "Model: {}",
+    matches.get_one::<String>("model").unwrap()
+  ));
 
   logger.log_step("Analyzing changes with AI");
-  let change_analysis = analysis::analyze_changes_with_ai(&client, &diff).await?;
-  logger.log_output(&format!("Change analysis length: {} characters", change_analysis.len()));
+  let analysis_response = analysis::analyze_changes_with_ai(&client, &diff).await?;
+  logger.log_output(&format!(
+    "Change analysis length: {} characters",
+    analysis_response.message.len()
+  ));
+  logger.log_output(&format!(
+    "Analysis usage - Input: {}, Output: {}, Total: {}",
+    analysis_response.usage.input_tokens,
+    analysis_response.usage.output_tokens,
+    analysis_response.usage.total_tokens
+  ));
 
   logger.log_step("Building user prompt");
   let user_prompt = prompt::get_commit_user_prompt(
@@ -107,13 +119,16 @@ async fn main() -> error::Result<()> {
     diff,
     modified_files,
     recent_commits,
-    change_analysis,
+    analysis_response.message,
   )
   .await?;
-  logger.log_output(&format!("User prompt length: {} characters", user_prompt.len()));
+  logger.log_output(&format!(
+    "User prompt length: {} characters",
+    user_prompt.len()
+  ));
 
   logger.log_step("Generating commit message");
-  let commit_message = match client {
+  let response = match client {
     Client::OpenAI(c) => {
       c.generate_response(prompt::get_commit_system_prompt(), user_prompt)
         .await?
@@ -124,8 +139,44 @@ async fn main() -> error::Result<()> {
     }
   };
 
+  let commit_message = response.message;
+
   println!("Generated commit message:\n");
   println!("{commit_message}");
+
+  // Log individual usage in verbose mode using logger
+  logger.log_output("--- Individual Usage ---");
+  logger.log_output("Analysis:");
+  logger.log_output(&format!(
+    "  Input tokens: {}",
+    analysis_response.usage.input_tokens
+  ));
+  logger.log_output(&format!(
+    "  Output tokens: {}",
+    analysis_response.usage.output_tokens
+  ));
+  logger.log_output(&format!(
+    "  Total tokens: {}",
+    analysis_response.usage.total_tokens
+  ));
+
+  logger.log_output("Commit Message Generation:");
+  logger.log_output(&format!("  Input tokens: {}", response.usage.input_tokens));
+  logger.log_output(&format!(
+    "  Output tokens: {}",
+    response.usage.output_tokens
+  ));
+  logger.log_output(&format!("  Total tokens: {}", response.usage.total_tokens));
+
+  // Always show total usage
+  let total_input = analysis_response.usage.input_tokens + response.usage.input_tokens;
+  let total_output = analysis_response.usage.output_tokens + response.usage.output_tokens;
+  let total_tokens = analysis_response.usage.total_tokens + response.usage.total_tokens;
+
+  println!("\n--- Total Usage ---");
+  println!("  Input tokens: {}", total_input);
+  println!("  Output tokens: {}", total_output);
+  println!("  Total tokens: {}", total_tokens);
 
   if !matches.get_flag("dry-run") {
     println!("\nCommit with this message? (y/N)");

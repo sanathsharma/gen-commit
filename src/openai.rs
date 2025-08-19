@@ -1,4 +1,4 @@
-use crate::client::{AIClient, ClientError, Result};
+use crate::client::{AIClient, ClientError, GenerateResponseResult, Result, UsageInfo};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 
@@ -20,6 +20,14 @@ struct OpenAIRequest {
 #[derive(Debug, Deserialize)]
 struct OpenAIResponse {
   output: Vec<ContentBlock>,
+  usage: OpenAIUsage,
+}
+
+#[derive(Debug, Deserialize)]
+struct OpenAIUsage {
+  input_tokens: u32,
+  output_tokens: u32,
+  total_tokens: u32,
 }
 
 #[derive(Debug, Deserialize)]
@@ -72,7 +80,7 @@ impl AIClient for OpenAIClient {
     &self,
     system_prompt: T,
     user_prompt: T,
-  ) -> Result<String> {
+  ) -> Result<GenerateResponseResult> {
     let system_message = OpenAIMessage {
       role: "system".to_string(),
       content: system_prompt.into(),
@@ -111,13 +119,19 @@ impl AIClient for OpenAIClient {
       .await
       .map_err(|_| ClientError::FailedToParseResponse)?;
 
-    Ok(
-      api_response
-        .output
-        .first()
-        .and_then(|block| block.content.first())
-        .map(|block| block.text.trim().to_string())
-        .unwrap_or_default(),
-    )
+    let message = api_response
+      .output
+      .first()
+      .and_then(|block| block.content.first())
+      .map(|block| block.text.trim().to_string())
+      .unwrap_or_default();
+
+    let usage = UsageInfo {
+      input_tokens: api_response.usage.input_tokens,
+      output_tokens: api_response.usage.output_tokens,
+      total_tokens: api_response.usage.total_tokens,
+    };
+
+    Ok(GenerateResponseResult { message, usage })
   }
 }
