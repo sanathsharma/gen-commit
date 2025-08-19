@@ -41,5 +41,12 @@ pub fn get_matches() -> ArgMatches {
         .env("GC_IGNORE_LIST")
         .default_value("package-lock.json,Cargo.lock,bun.lock,pnpm-lock.yaml"),
     )
+    .arg(
+      Arg::new("verbose")
+        .short('v')
+        .long("verbose")
+        .help("Enable verbose logging to show current steps and their outputs")
+        .action(clap::ArgAction::SetTrue),
+    )
     .get_matches()
 }
