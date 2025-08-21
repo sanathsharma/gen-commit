@@ -79,7 +79,10 @@ async fn main() -> error::Result<()> {
   }
 
   logger.log_step("Getting recent commits");
-  let recent_commits = git::get_recent_commits(5).await?;
+  let recent_commits = git::get_recent_commits(5).await.unwrap_or_else(|_| {
+    logger.log_output("Warning: Unable to get recent commits, continuing without them");
+    Vec::new()
+  });
   logger.log_output(&format!("Recent commits count: {}", recent_commits.len()));
   if !recent_commits.is_empty() {
     logger.log_output("Recent commits:");
