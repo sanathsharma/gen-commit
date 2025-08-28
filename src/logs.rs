@@ -67,7 +67,12 @@ impl Logger {
   }
 
   /// Execute a Result-returning future with automatic logging and result formatting
-  pub async fn exec_result_with_output<T, E, F, Fut, G>(&self, step_name: &str, future: F, format_fn: G) -> Result<T, E>
+  pub async fn exec_result_with_output<T, E, F, Fut, G>(
+    &self,
+    step_name: &str,
+    future: F,
+    format_fn: G,
+  ) -> Result<T, E>
   where
     F: FnOnce() -> Fut,
     Fut: std::future::Future<Output = Result<T, E>>,
@@ -91,7 +96,12 @@ impl Logger {
   }
 
   /// Execute a synchronous Result-returning operation with automatic logging and result formatting
-  pub fn exec_sync_result_with_output<T, E, F, G>(&self, step_name: &str, operation: F, format_fn: G) -> Result<T, E>
+  pub fn exec_sync_result_with_output<T, E, F, G>(
+    &self,
+    step_name: &str,
+    operation: F,
+    format_fn: G,
+  ) -> Result<T, E>
   where
     F: FnOnce() -> Result<T, E>,
     G: FnOnce(&T) -> String,

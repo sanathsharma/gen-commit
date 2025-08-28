@@ -36,7 +36,9 @@ pub trait AIClient: Send + Sync {
     &self,
     system_prompt: String,
     user_prompt: String,
-  ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<GenerateResponseResult>> + Send + '_>>;
+  ) -> std::pin::Pin<
+    Box<dyn std::future::Future<Output = Result<GenerateResponseResult>> + Send + '_>,
+  >;
 }
 
 pub enum ModelProvider {
@@ -86,17 +88,13 @@ impl ClientBuilder {
   pub fn build(self) -> std::result::Result<Box<dyn AIClient>, CreateClientError> {
     let (provider, model_name) = parse_model(&self.model)?;
     let api_key = get_provider_key(&provider)?;
-    
+
     let max_tokens = self.max_tokens.unwrap_or(500);
     let temperature = self.temperature.unwrap_or(0.2);
 
     let mut client: Box<dyn AIClient> = match provider {
-      ModelProvider::OpenAI => {
-        Box::new(OpenAIClient::new(api_key))
-      }
-      ModelProvider::Anthropic => {
-        Box::new(AnthropicClient::new(api_key))
-      }
+      ModelProvider::OpenAI => Box::new(OpenAIClient::new(api_key)),
+      ModelProvider::Anthropic => Box::new(AnthropicClient::new(api_key)),
     };
 
     client.set_model(model_name);
@@ -111,9 +109,7 @@ pub fn create_client(
   model: &str,
   max_tokens: u32,
 ) -> std::result::Result<Box<dyn AIClient>, CreateClientError> {
-  ClientBuilder::new(model)
-    .max_tokens(max_tokens)
-    .build()
+  ClientBuilder::new(model).max_tokens(max_tokens).build()
 }
 
 fn parse_model(model: &str) -> std::result::Result<(ModelProvider, String), ParseModelError> {

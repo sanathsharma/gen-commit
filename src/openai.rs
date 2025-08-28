@@ -77,7 +77,9 @@ impl AIClient for OpenAIClient {
     &self,
     system_prompt: String,
     user_prompt: String,
-  ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<GenerateResponseResult>> + Send + '_>> {
+  ) -> std::pin::Pin<
+    Box<dyn std::future::Future<Output = Result<GenerateResponseResult>> + Send + '_>,
+  > {
     Box::pin(self.generate_response_impl(system_prompt, user_prompt))
   }
 }

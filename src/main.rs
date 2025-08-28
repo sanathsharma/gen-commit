@@ -42,76 +42,97 @@ async fn initialize_app() -> error::Result<(Logger, clap::ArgMatches)> {
   Ok((logger, matches))
 }
 
-async fn gather_git_context(logger: &Logger, ignore_list: &mut Vec<String>) -> error::Result<AppContext> {
-  let root_dir = logger.exec_result_with_output(
-    "Getting git root directory", 
-    || git::get_git_root(), 
-    |root| format!("Git root: {}", root)
-  ).await?;
+async fn gather_git_context(
+  logger: &Logger,
+  ignore_list: &mut Vec<String>,
+) -> error::Result<AppContext> {
+  let root_dir = logger
+    .exec_result_with_output(
+      "Getting git root directory",
+      || git::get_git_root(),
+      |root| format!("Git root: {}", root),
+    )
+    .await?;
 
-  let branch_name = logger.exec_result_with_output(
-    "Getting current branch name", 
-    || git::get_branch_name(), 
-    |branch| format!("Branch: {}", branch)
-  ).await?;
+  let branch_name = logger
+    .exec_result_with_output(
+      "Getting current branch name",
+      || git::get_branch_name(),
+      |branch| format!("Branch: {}", branch),
+    )
+    .await?;
 
-  let scopes = logger.exec_with_output(
-    "Reading scopes file",
-    || async { file::read_file(format!("{root_dir}/scopes.txt")).await.unwrap_or_default() },
-    |scopes| format!("Scopes found: {}", !scopes.is_empty())
-  ).await;
+  let scopes = logger
+    .exec_with_output(
+      "Reading scopes file",
+      || async {
+        file::read_file(format!("{root_dir}/scopes.txt"))
+          .await
+          .unwrap_or_default()
+      },
+      |scopes| format!("Scopes found: {}", !scopes.is_empty()),
+    )
+    .await;
 
-  let is_nx_repo = logger.exec_with_output(
-    "Checking for Nx repository",
-    || async { file::file_exists(format!("{root_dir}/nx.json")) },
-    |nx| format!("Nx repo: {}", nx)
-  ).await;
+  let is_nx_repo = logger
+    .exec_with_output(
+      "Checking for Nx repository",
+      || async { file::file_exists(format!("{root_dir}/nx.json")) },
+      |nx| format!("Nx repo: {}", nx),
+    )
+    .await;
 
-  let diff = logger.exec_result_with_output(
-    "Getting staged diff",
-    || git::get_staged_diff(ignore_list),
-    |d| format!("Diff length: {} characters", d.len())
-  ).await?;
+  let diff = logger
+    .exec_result_with_output(
+      "Getting staged diff",
+      || git::get_staged_diff(ignore_list),
+      |d| format!("Diff length: {} characters", d.len()),
+    )
+    .await?;
 
   if diff.is_empty() {
     eprintln!("no changes detected");
     std::process::exit(1);
   }
 
-  let modified_files = logger.exec_result_with_output(
-    "Getting modified files",
-    || git::get_modified_files(),
-    |files| {
-      let mut output = format!("Modified files count: {}", files.len());
-      if !files.is_empty() {
-        output.push_str("\nModified files:");
-        for file in files {
-          output.push_str(&format!("\n  - {}", file));
+  let modified_files = logger
+    .exec_result_with_output(
+      "Getting modified files",
+      || git::get_modified_files(),
+      |files| {
+        let mut output = format!("Modified files count: {}", files.len());
+        if !files.is_empty() {
+          output.push_str("\nModified files:");
+          for file in files {
+            output.push_str(&format!("\n  - {}", file));
+          }
         }
-      }
-      output
-    }
-  ).await?;
+        output
+      },
+    )
+    .await?;
 
-  let recent_commits = logger.exec_with_output(
-    "Getting recent commits",
-    || async {
-      git::get_recent_commits(5).await.unwrap_or_else(|_| {
-        println!("[OUTPUT] Warning: Unable to get recent commits, continuing without them");
-        Vec::new()
-      })
-    },
-    |commits| {
-      let mut output = format!("Recent commits count: {}", commits.len());
-      if !commits.is_empty() {
-        output.push_str("\nRecent commits:");
-        for commit in commits {
-          output.push_str(&format!("\n  - {}", commit));
+  let recent_commits = logger
+    .exec_with_output(
+      "Getting recent commits",
+      || async {
+        git::get_recent_commits(5).await.unwrap_or_else(|_| {
+          println!("[OUTPUT] Warning: Unable to get recent commits, continuing without them");
+          Vec::new()
+        })
+      },
+      |commits| {
+        let mut output = format!("Recent commits count: {}", commits.len());
+        if !commits.is_empty() {
+          output.push_str("\nRecent commits:");
+          for commit in commits {
+            output.push_str(&format!("\n  - {}", commit));
+          }
         }
-      }
-      output
-    }
-  ).await;
+        output
+      },
+    )
+    .await;
 
   Ok(AppContext {
     branch_name,
@@ -130,11 +151,13 @@ async fn process_with_ai(
 ) -> error::Result<(String, Option<UsageInfo>, UsageInfo)> {
   let client = logger.exec_sync_result_with_output(
     "Creating AI client",
-    || client::create_client(
-      matches.get_one::<String>("model").unwrap(),
-      *matches.get_one::<u32>("max-tokens").unwrap(),
-    ),
-    |_| format!("Model: {}", matches.get_one::<String>("model").unwrap())
+    || {
+      client::create_client(
+        matches.get_one::<String>("model").unwrap(),
+        *matches.get_one::<u32>("max-tokens").unwrap(),
+      )
+    },
+    |_| format!("Model: {}", matches.get_one::<String>("model").unwrap()),
   )?;
 
   let (analysis_message, analysis_usage) = if matches.get_flag("no-analysis") {
@@ -156,24 +179,29 @@ async fn process_with_ai(
     (analysis_response.message, Some(analysis_response.usage))
   };
 
-  let user_prompt = logger.exec_result_with_output(
-    "Building user prompt",
-    || prompt::get_commit_user_prompt(
-      context.branch_name.clone(),
-      context.scopes.clone(),
-      context.is_nx_repo,
-      context.diff.clone(),
-      context.modified_files.clone(),
-      context.recent_commits.clone(),
-      analysis_message,
-    ),
-    |prompt| format!("User prompt length: {} characters", prompt.len())
-  ).await?;
+  let user_prompt = logger
+    .exec_result_with_output(
+      "Building user prompt",
+      || {
+        prompt::get_commit_user_prompt(
+          context.branch_name.clone(),
+          context.scopes.clone(),
+          context.is_nx_repo,
+          context.diff.clone(),
+          context.modified_files.clone(),
+          context.recent_commits.clone(),
+          analysis_message,
+        )
+      },
+      |prompt| format!("User prompt length: {} characters", prompt.len()),
+    )
+    .await?;
 
-  let response = logger.exec_result(
-    "Generating commit message",
-    || client.generate_response(prompt::get_commit_system_prompt(), user_prompt)
-  ).await?;
+  let response = logger
+    .exec_result("Generating commit message", || {
+      client.generate_response(prompt::get_commit_system_prompt(), user_prompt)
+    })
+    .await?;
 
   Ok((response.message, analysis_usage, response.usage))
 }
@@ -188,9 +216,18 @@ fn report_usage(logger: &Logger, analysis_usage: &Option<UsageInfo>, generation_
   }
 
   logger.log_output("Commit Message Generation:");
-  logger.log_output(&format!("  Input tokens: {}", generation_usage.input_tokens));
-  logger.log_output(&format!("  Output tokens: {}", generation_usage.output_tokens));
-  logger.log_output(&format!("  Total tokens: {}", generation_usage.total_tokens));
+  logger.log_output(&format!(
+    "  Input tokens: {}",
+    generation_usage.input_tokens
+  ));
+  logger.log_output(&format!(
+    "  Output tokens: {}",
+    generation_usage.output_tokens
+  ));
+  logger.log_output(&format!(
+    "  Total tokens: {}",
+    generation_usage.total_tokens
+  ));
 
   let (total_input, total_output, total_tokens) = if let Some(usage) = analysis_usage {
     (
@@ -223,11 +260,13 @@ async fn handle_commit_confirmation(
     std::io::stdin().read_line(&mut input)?;
 
     if input.trim().to_lowercase() == "y" {
-      logger.exec_result_with_output(
-        "Committing changes",
-        || git::commit(commit_message),
-        |_| "Commit successful".to_string()
-      ).await?;
+      logger
+        .exec_result_with_output(
+          "Committing changes",
+          || git::commit(commit_message),
+          |_| "Commit successful".to_string(),
+        )
+        .await?;
       println!("Successfully committed!");
     } else {
       println!("Commit cancelled.");
@@ -252,11 +291,8 @@ async fn main() -> error::Result<()> {
 
   let context = gather_git_context(&logger, &mut ignore_list).await?;
 
-  let (commit_message, analysis_usage, generation_usage) = process_with_ai(
-    &logger,
-    &matches,
-    &context,
-  ).await?;
+  let (commit_message, analysis_usage, generation_usage) =
+    process_with_ai(&logger, &matches, &context).await?;
 
   println!("Generated commit message:\n");
   println!("{commit_message}");
