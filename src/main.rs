@@ -43,55 +43,75 @@ async fn initialize_app() -> error::Result<(Logger, clap::ArgMatches)> {
 }
 
 async fn gather_git_context(logger: &Logger, ignore_list: &mut Vec<String>) -> error::Result<AppContext> {
-  logger.log_step("Getting git root directory");
-  let root_dir = git::get_git_root().await?;
-  logger.log_output(&format!("Git root: {}", root_dir));
+  let root_dir = logger.exec_result_with_output(
+    "Getting git root directory", 
+    || git::get_git_root(), 
+    |root| format!("Git root: {}", root)
+  ).await?;
 
-  logger.log_step("Getting current branch name");
-  let branch_name = git::get_branch_name().await?;
-  logger.log_output(&format!("Branch: {}", branch_name));
+  let branch_name = logger.exec_result_with_output(
+    "Getting current branch name", 
+    || git::get_branch_name(), 
+    |branch| format!("Branch: {}", branch)
+  ).await?;
 
-  logger.log_step("Reading scopes file");
-  let scopes = file::read_file(format!("{root_dir}/scopes.txt"))
-    .await
-    .unwrap_or_default();
-  logger.log_output(&format!("Scopes found: {}", !scopes.is_empty()));
+  let scopes = logger.exec_with_output(
+    "Reading scopes file",
+    || async { file::read_file(format!("{root_dir}/scopes.txt")).await.unwrap_or_default() },
+    |scopes| format!("Scopes found: {}", !scopes.is_empty())
+  ).await;
 
-  logger.log_step("Checking for Nx repository");
-  let is_nx_repo = file::file_exists(format!("{root_dir}/nx.json"));
-  logger.log_output(&format!("Nx repo: {}", is_nx_repo));
+  let is_nx_repo = logger.exec_with_output(
+    "Checking for Nx repository",
+    || async { file::file_exists(format!("{root_dir}/nx.json")) },
+    |nx| format!("Nx repo: {}", nx)
+  ).await;
 
-  logger.log_step("Getting staged diff");
-  let diff = git::get_staged_diff(ignore_list).await?;
-  logger.log_output(&format!("Diff length: {} characters", diff.len()));
+  let diff = logger.exec_result_with_output(
+    "Getting staged diff",
+    || git::get_staged_diff(ignore_list),
+    |d| format!("Diff length: {} characters", d.len())
+  ).await?;
 
   if diff.is_empty() {
     eprintln!("no changes detected");
     std::process::exit(1);
   }
 
-  logger.log_step("Getting modified files");
-  let modified_files = git::get_modified_files().await?;
-  logger.log_output(&format!("Modified files count: {}", modified_files.len()));
-  if !modified_files.is_empty() {
-    logger.log_output("Modified files:");
-    for file in &modified_files {
-      logger.log_output(&format!("  - {}", file));
+  let modified_files = logger.exec_result_with_output(
+    "Getting modified files",
+    || git::get_modified_files(),
+    |files| {
+      let mut output = format!("Modified files count: {}", files.len());
+      if !files.is_empty() {
+        output.push_str("\nModified files:");
+        for file in files {
+          output.push_str(&format!("\n  - {}", file));
+        }
+      }
+      output
     }
-  }
+  ).await?;
 
-  logger.log_step("Getting recent commits");
-  let recent_commits = git::get_recent_commits(5).await.unwrap_or_else(|_| {
-    logger.log_output("Warning: Unable to get recent commits, continuing without them");
-    Vec::new()
-  });
-  logger.log_output(&format!("Recent commits count: {}", recent_commits.len()));
-  if !recent_commits.is_empty() {
-    logger.log_output("Recent commits:");
-    for commit in &recent_commits {
-      logger.log_output(&format!("  - {}", commit));
+  let recent_commits = logger.exec_with_output(
+    "Getting recent commits",
+    || async {
+      git::get_recent_commits(5).await.unwrap_or_else(|_| {
+        println!("[OUTPUT] Warning: Unable to get recent commits, continuing without them");
+        Vec::new()
+      })
+    },
+    |commits| {
+      let mut output = format!("Recent commits count: {}", commits.len());
+      if !commits.is_empty() {
+        output.push_str("\nRecent commits:");
+        for commit in commits {
+          output.push_str(&format!("\n  - {}", commit));
+        }
+      }
+      output
     }
-  }
+  ).await;
 
   Ok(AppContext {
     branch_name,
@@ -108,55 +128,51 @@ async fn process_with_ai(
   matches: &clap::ArgMatches,
   context: &AppContext,
 ) -> error::Result<(String, Option<UsageInfo>, UsageInfo)> {
-  logger.log_step("Creating AI client");
-  let client = client::create_client(
-    matches.get_one::<String>("model").unwrap(),
-    *matches.get_one::<u32>("max-tokens").unwrap(),
+  let client = logger.exec_sync_result_with_output(
+    "Creating AI client",
+    || client::create_client(
+      matches.get_one::<String>("model").unwrap(),
+      *matches.get_one::<u32>("max-tokens").unwrap(),
+    ),
+    |_| format!("Model: {}", matches.get_one::<String>("model").unwrap())
   )?;
-  logger.log_output(&format!(
-    "Model: {}",
-    matches.get_one::<String>("model").unwrap()
-  ));
 
   let (analysis_message, analysis_usage) = if matches.get_flag("no-analysis") {
     logger.log_step("Skipping AI analysis (--no-analysis flag enabled)");
     (String::new(), None)
   } else {
-    logger.log_step("Analyzing changes with AI");
-    let analysis_response = analysis::analyze_changes_with_ai(client.as_ref(), &context.diff).await?;
-    logger.log_output(&format!(
-      "Change analysis length: {} characters",
-      analysis_response.message.len()
-    ));
-    logger.log_output(&format!(
-      "Analysis usage - Input: {}, Output: {}, Total: {}",
-      analysis_response.usage.input_tokens,
-      analysis_response.usage.output_tokens,
-      analysis_response.usage.total_tokens
-    ));
+    let analysis_response = logger.exec_result_with_output(
+      "Analyzing changes with AI",
+      || analysis::analyze_changes_with_ai(client.as_ref(), &context.diff),
+      |resp| format!(
+        "Change analysis length: {} characters\nAnalysis usage - Input: {}, Output: {}, Total: {}",
+        resp.message.len(),
+        resp.usage.input_tokens,
+        resp.usage.output_tokens,
+        resp.usage.total_tokens
+      )
+    ).await?;
     (analysis_response.message, Some(analysis_response.usage))
   };
 
-  logger.log_step("Building user prompt");
-  let user_prompt = prompt::get_commit_user_prompt(
-    context.branch_name.clone(),
-    context.scopes.clone(),
-    context.is_nx_repo,
-    context.diff.clone(),
-    context.modified_files.clone(),
-    context.recent_commits.clone(),
-    analysis_message,
-  )
-  .await?;
-  logger.log_output(&format!(
-    "User prompt length: {} characters",
-    user_prompt.len()
-  ));
+  let user_prompt = logger.exec_result_with_output(
+    "Building user prompt",
+    || prompt::get_commit_user_prompt(
+      context.branch_name.clone(),
+      context.scopes.clone(),
+      context.is_nx_repo,
+      context.diff.clone(),
+      context.modified_files.clone(),
+      context.recent_commits.clone(),
+      analysis_message,
+    ),
+    |prompt| format!("User prompt length: {} characters", prompt.len())
+  ).await?;
 
-  logger.log_step("Generating commit message");
-  let response = client
-    .generate_response(prompt::get_commit_system_prompt(), user_prompt)
-    .await?;
+  let response = logger.exec_result(
+    "Generating commit message",
+    || client.generate_response(prompt::get_commit_system_prompt(), user_prompt)
+  ).await?;
 
   Ok((response.message, analysis_usage, response.usage))
 }
@@ -206,9 +222,11 @@ async fn handle_commit_confirmation(
     std::io::stdin().read_line(&mut input)?;
 
     if input.trim().to_lowercase() == "y" {
-      logger.log_step("Committing changes");
-      git::commit(commit_message).await?;
-      logger.log_output("Commit successful");
+      logger.exec_result_with_output(
+        "Committing changes",
+        || git::commit(commit_message),
+        |_| "Commit successful".to_string()
+      ).await?;
       println!("Successfully committed!");
     } else {
       println!("Commit cancelled.");
