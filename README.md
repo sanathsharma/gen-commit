@@ -11,6 +11,8 @@ Gen-Commit analyzes your staged git changes and generates meaningful, convention
 - Generates commit messages based on staged git changes
 - Follows conventional commit format (`type(scope): description`)
 - Supports both Anthropic and OpenAI models
+- AI-powered change analysis for enhanced commit message context
+- Optional `--no-analysis` mode for faster, cost-effective commits
 - Considers branch name for context
 - Supports Nx repository structure detection
 - Allows custom scopes via a `scopes.txt` file
@@ -57,6 +59,9 @@ gen-commit --max-tokens 1000
 
 # Ignore specific files or directories in the diff
 gen-commit --ignore "node_modules,dist,*.log"
+
+# Skip AI-powered change analysis for faster, cost-effective commits
+gen-commit --no-analysis
 ```
 
 ## Configuration
@@ -118,14 +123,51 @@ You can change the default ignore list by setting the `GC_IGNORE_LIST` environme
 export GC_IGNORE_LIST=package-lock.json,*.log
 ```
 
+### Analysis Mode
+
+By default, gen-commit uses a two-step AI approach for enhanced commit messages:
+
+1. **Change Analysis**: AI analyzes the git diff to understand what changed
+2. **Commit Generation**: AI generates a commit message using the analysis + context
+
+#### Skip Analysis Mode (`--no-analysis`)
+
+Use `--no-analysis` to skip the change analysis step and generate commit messages directly from the git diff:
+
+```bash
+gen-commit --no-analysis
+```
+
+**Benefits:**
+- **~50% cost reduction** - Uses half the AI tokens by skipping analysis
+- **Faster execution** - One fewer API call means quicker results  
+- **Good for simple changes** - Direct diff-to-commit works well for straightforward modifications
+
+**When to use:**
+- Simple bug fixes or refactoring
+- Cost-conscious workflows
+- When speed is prioritized over detailed analysis
+- Changes where git diff provides sufficient context
+
 ## How It Works
 
+**Default Mode (with analysis):**
 1. Verifies you're in a git repository
 2. Gets the current branch name for context
 3. Checks for custom scopes and Nx repository structure
 4. Retrieves the diff of staged changes
-5. Sends the information to the selected AI model
-6. Presents the generated commit message
+5. **Analyzes changes** with AI to understand modifications
+6. **Generates commit message** using analysis + context
+7. Presents the generated commit message with token usage
+8. Optionally commits with the generated message after confirmation
+
+**Skip Analysis Mode (`--no-analysis`):**
+1. Verifies you're in a git repository  
+2. Gets the current branch name for context
+3. Checks for custom scopes and Nx repository structure
+4. Retrieves the diff of staged changes
+5. **Generates commit message** directly from diff + context *(skips analysis step)*
+6. Presents the generated commit message with token usage
 7. Optionally commits with the generated message after confirmation
 
 ## Requirements
