@@ -145,11 +145,12 @@ async fn process_with_ai(
       "Analyzing changes with AI",
       || analysis::analyze_changes_with_ai(client.as_ref(), &context.diff),
       |resp| format!(
-        "Change analysis length: {} characters\nAnalysis usage - Input: {}, Output: {}, Total: {}",
+        "Change analysis length: {} characters\nAnalysis usage - Input: {}, Output: {}, Total: {}\nAnalysis content:\n{}",
         resp.message.len(),
         resp.usage.input_tokens,
         resp.usage.output_tokens,
-        resp.usage.total_tokens
+        resp.usage.total_tokens,
+        resp.message
       )
     ).await?;
     (analysis_response.message, Some(analysis_response.usage))
