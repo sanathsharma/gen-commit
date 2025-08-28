@@ -1,6 +1,5 @@
-use client::Client;
+#![allow(dead_code)]
 
-use crate::client::AIClient;
 use crate::git::is_git_repo;
 use crate::logs::{LogLevel, Logger};
 
@@ -102,7 +101,7 @@ async fn main() -> error::Result<()> {
   ));
 
   logger.log_step("Analyzing changes with AI");
-  let analysis_response = analysis::analyze_changes_with_ai(&client, &diff).await?;
+  let analysis_response = analysis::analyze_changes_with_ai(client.as_ref(), &diff).await?;
   logger.log_output(&format!(
     "Change analysis length: {} characters",
     analysis_response.message.len()
@@ -131,16 +130,9 @@ async fn main() -> error::Result<()> {
   ));
 
   logger.log_step("Generating commit message");
-  let response = match client {
-    Client::OpenAI(c) => {
-      c.generate_response(prompt::get_commit_system_prompt(), user_prompt)
-        .await?
-    }
-    Client::Anthropic(c) => {
-      c.generate_response(prompt::get_commit_system_prompt(), user_prompt)
-        .await?
-    }
-  };
+  let response = client
+    .generate_response(prompt::get_commit_system_prompt(), user_prompt)
+    .await?;
 
   let commit_message = response.message;
 

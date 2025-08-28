@@ -1,4 +1,4 @@
-use crate::client::{AIClient, Client, GenerateResponseResult, Result};
+use crate::client::{AIClient, GenerateResponseResult, Result};
 use std::collections::HashMap;
 
 pub fn group_files_by_type(modified_files: Vec<String>) -> String {
@@ -74,7 +74,7 @@ pub fn format_recent_commits(commits: Vec<String>) -> String {
 }
 
 pub async fn analyze_changes_with_ai(
-  client: &Client,
+  client: &dyn AIClient,
   diff: &str,
 ) -> Result<GenerateResponseResult> {
   // Create system prompt for analysis
@@ -102,10 +102,7 @@ pub async fn analyze_changes_with_ai(
   .to_string();
 
   // Call the AI model to analyze the changes
-  let response = match client {
-    Client::OpenAI(c) => c.generate_response(system_prompt, user_prompt).await?,
-    Client::Anthropic(c) => c.generate_response(system_prompt, user_prompt).await?,
-  };
+  let response = client.generate_response(system_prompt, user_prompt).await?;
 
   Ok(response)
 }

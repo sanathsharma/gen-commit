@@ -28,15 +28,15 @@ pub enum ClientError {
 
 pub type Result<T> = std::result::Result<T, ClientError>;
 
-pub trait AIClient {
-  fn with_model(&mut self, model: String) -> &mut Self;
-  fn with_max_tokens(&mut self, max_tokens: u32) -> &mut Self;
-  fn with_temperature(&mut self, temperature: f32) -> &mut Self;
-  async fn generate_response<T: Into<String>>(
+pub trait AIClient: Send + Sync {
+  fn set_model(&mut self, model: String);
+  fn set_max_tokens(&mut self, max_tokens: u32);
+  fn set_temperature(&mut self, temperature: f32);
+  fn generate_response(
     &self,
-    system_prompt: T,
-    user_prompt: T,
-  ) -> Result<GenerateResponseResult>;
+    system_prompt: String,
+    user_prompt: String,
+  ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<GenerateResponseResult>> + Send + '_>>;
 }
 
 pub enum ModelProvider {
@@ -58,40 +58,62 @@ pub enum CreateClientError {
   APIKeyError(#[from] VarError),
 }
 
-pub enum Client {
-  OpenAI(OpenAIClient),
-  Anthropic(AnthropicClient),
+pub struct ClientBuilder {
+  model: String,
+  max_tokens: Option<u32>,
+  temperature: Option<f32>,
+}
+
+impl ClientBuilder {
+  pub fn new(model: &str) -> Self {
+    Self {
+      model: model.to_string(),
+      max_tokens: None,
+      temperature: None,
+    }
+  }
+
+  pub fn max_tokens(mut self, max_tokens: u32) -> Self {
+    self.max_tokens = Some(max_tokens);
+    self
+  }
+
+  pub fn temperature(mut self, temperature: f32) -> Self {
+    self.temperature = Some(temperature);
+    self
+  }
+
+  pub fn build(self) -> std::result::Result<Box<dyn AIClient>, CreateClientError> {
+    let (provider, model_name) = parse_model(&self.model)?;
+    let api_key = get_provider_key(&provider)?;
+    
+    let max_tokens = self.max_tokens.unwrap_or(500);
+    let temperature = self.temperature.unwrap_or(0.2);
+
+    let mut client: Box<dyn AIClient> = match provider {
+      ModelProvider::OpenAI => {
+        Box::new(OpenAIClient::new(api_key))
+      }
+      ModelProvider::Anthropic => {
+        Box::new(AnthropicClient::new(api_key))
+      }
+    };
+
+    client.set_model(model_name);
+    client.set_max_tokens(max_tokens);
+    client.set_temperature(temperature);
+
+    Ok(client)
+  }
 }
 
 pub fn create_client(
   model: &str,
   max_tokens: u32,
-) -> std::result::Result<Client, CreateClientError> {
-  let (provider, model) = parse_model(model)?;
-  let api_key = get_provider_key(&provider)?;
-
-  let client = match provider {
-    ModelProvider::OpenAI => {
-      let mut openai_client = OpenAIClient::new(api_key);
-      openai_client
-        .with_model(model)
-        .with_max_tokens(max_tokens)
-        .with_temperature(0.2);
-
-      Client::OpenAI(openai_client)
-    }
-    ModelProvider::Anthropic => {
-      let mut anthropic_client = AnthropicClient::new(api_key);
-      anthropic_client
-        .with_model(model)
-        .with_max_tokens(max_tokens)
-        .with_temperature(0.2);
-
-      Client::Anthropic(anthropic_client)
-    }
-  };
-
-  Ok(client)
+) -> std::result::Result<Box<dyn AIClient>, CreateClientError> {
+  ClientBuilder::new(model)
+    .max_tokens(max_tokens)
+    .build()
 }
 
 fn parse_model(model: &str) -> std::result::Result<(ModelProvider, String), ParseModelError> {

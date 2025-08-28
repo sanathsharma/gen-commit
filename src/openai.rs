@@ -61,34 +61,41 @@ impl OpenAIClient {
 }
 
 impl AIClient for OpenAIClient {
-  fn with_model(&mut self, model: String) -> &mut Self {
+  fn set_model(&mut self, model: String) {
     self.model = model;
-    self
   }
 
-  fn with_max_tokens(&mut self, max_tokens: u32) -> &mut Self {
+  fn set_max_tokens(&mut self, max_tokens: u32) {
     self.max_tokens = max_tokens;
-    self
   }
 
-  fn with_temperature(&mut self, temperature: f32) -> &mut Self {
+  fn set_temperature(&mut self, temperature: f32) {
     self.temperature = temperature;
-    self
   }
 
-  async fn generate_response<T: Into<String>>(
+  fn generate_response(
     &self,
-    system_prompt: T,
-    user_prompt: T,
+    system_prompt: String,
+    user_prompt: String,
+  ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<GenerateResponseResult>> + Send + '_>> {
+    Box::pin(self.generate_response_impl(system_prompt, user_prompt))
+  }
+}
+
+impl OpenAIClient {
+  async fn generate_response_impl(
+    &self,
+    system_prompt: String,
+    user_prompt: String,
   ) -> Result<GenerateResponseResult> {
     let system_message = OpenAIMessage {
       role: "system".to_string(),
-      content: system_prompt.into(),
+      content: system_prompt,
     };
 
     let user_message = OpenAIMessage {
       role: "user".to_string(),
-      content: user_prompt.into(),
+      content: user_prompt,
     };
 
     let request = OpenAIRequest {
