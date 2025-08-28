@@ -48,5 +48,11 @@ pub fn get_matches() -> ArgMatches {
         .help("Enable verbose logging to show current steps and their outputs")
         .action(clap::ArgAction::SetTrue),
     )
+    .arg(
+      Arg::new("no-analysis")
+        .long("no-analysis")
+        .help("Skip AI-powered change analysis and generate commit message directly from diff")
+        .action(clap::ArgAction::SetTrue),
+    )
     .get_matches()
 }

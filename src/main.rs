@@ -100,18 +100,24 @@ async fn main() -> error::Result<()> {
     matches.get_one::<String>("model").unwrap()
   ));
 
-  logger.log_step("Analyzing changes with AI");
-  let analysis_response = analysis::analyze_changes_with_ai(client.as_ref(), &diff).await?;
-  logger.log_output(&format!(
-    "Change analysis length: {} characters",
-    analysis_response.message.len()
-  ));
-  logger.log_output(&format!(
-    "Analysis usage - Input: {}, Output: {}, Total: {}",
-    analysis_response.usage.input_tokens,
-    analysis_response.usage.output_tokens,
-    analysis_response.usage.total_tokens
-  ));
+  let (analysis_message, analysis_usage) = if matches.get_flag("no-analysis") {
+    logger.log_step("Skipping AI analysis (--no-analysis flag enabled)");
+    (String::new(), None)
+  } else {
+    logger.log_step("Analyzing changes with AI");
+    let analysis_response = analysis::analyze_changes_with_ai(client.as_ref(), &diff).await?;
+    logger.log_output(&format!(
+      "Change analysis length: {} characters",
+      analysis_response.message.len()
+    ));
+    logger.log_output(&format!(
+      "Analysis usage - Input: {}, Output: {}, Total: {}",
+      analysis_response.usage.input_tokens,
+      analysis_response.usage.output_tokens,
+      analysis_response.usage.total_tokens
+    ));
+    (analysis_response.message, Some(analysis_response.usage))
+  };
 
   logger.log_step("Building user prompt");
   let user_prompt = prompt::get_commit_user_prompt(
@@ -121,7 +127,7 @@ async fn main() -> error::Result<()> {
     diff,
     modified_files,
     recent_commits,
-    analysis_response.message,
+    analysis_message,
   )
   .await?;
   logger.log_output(&format!(
@@ -141,19 +147,12 @@ async fn main() -> error::Result<()> {
 
   // Log individual usage in verbose mode using logger
   logger.log_output("--- Individual Usage ---");
-  logger.log_output("Analysis:");
-  logger.log_output(&format!(
-    "  Input tokens: {}",
-    analysis_response.usage.input_tokens
-  ));
-  logger.log_output(&format!(
-    "  Output tokens: {}",
-    analysis_response.usage.output_tokens
-  ));
-  logger.log_output(&format!(
-    "  Total tokens: {}",
-    analysis_response.usage.total_tokens
-  ));
+  if let Some(usage) = &analysis_usage {
+    logger.log_output("Analysis:");
+    logger.log_output(&format!("  Input tokens: {}", usage.input_tokens));
+    logger.log_output(&format!("  Output tokens: {}", usage.output_tokens));
+    logger.log_output(&format!("  Total tokens: {}", usage.total_tokens));
+  }
 
   logger.log_output("Commit Message Generation:");
   logger.log_output(&format!("  Input tokens: {}", response.usage.input_tokens));
@@ -163,10 +162,20 @@ async fn main() -> error::Result<()> {
   ));
   logger.log_output(&format!("  Total tokens: {}", response.usage.total_tokens));
 
-  // Always show total usage
-  let total_input = analysis_response.usage.input_tokens + response.usage.input_tokens;
-  let total_output = analysis_response.usage.output_tokens + response.usage.output_tokens;
-  let total_tokens = analysis_response.usage.total_tokens + response.usage.total_tokens;
+  // Calculate total usage
+  let (total_input, total_output, total_tokens) = if let Some(usage) = &analysis_usage {
+    (
+      usage.input_tokens + response.usage.input_tokens,
+      usage.output_tokens + response.usage.output_tokens,
+      usage.total_tokens + response.usage.total_tokens,
+    )
+  } else {
+    (
+      response.usage.input_tokens,
+      response.usage.output_tokens,
+      response.usage.total_tokens,
+    )
+  };
 
   println!("\n--- Total Usage ---");
   println!("  Input tokens: {}", total_input);
