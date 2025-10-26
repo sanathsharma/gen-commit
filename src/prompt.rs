@@ -59,6 +59,11 @@ Follow the pattern: `<type>[optional scope]: <description>`
 - Do not invent scopes that aren't in the provided list
 - For Nx repositories, prefer using the app or lib name that contains the changed files as the scope
 - If the scopes list is empty and it's not an Nx repo, you may derive a scope from the directory names in the diff
+- From the commit history, prepend any prefixs that is commonly used in the previous commits
+
+Examples with prefix:
+- `[Company] feat(helix): add typescript lsp support`
+- `[Company] fix(nvim): resolve plugin loading issue`
 
 Examples with scope:
 - `feat(helix): add typescript lsp support`
